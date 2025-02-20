@@ -6,17 +6,15 @@ import (
 	"os"
 
 	"github.com/frankhuettner/gator-cobra/internal/database"
-	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 )
 
 // connectDB is a helper function that handles database connection
 func connectDB() (*database.DB, error) {
-	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("error loading .env file: %v", err)
-	}
-
 	dbURL := os.Getenv("DB_URL")
+	if dbURL == "" {
+		return nil, fmt.Errorf("database URL not configured in environment")
+	}
 	db, err := database.Connect(dbURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %v", err)

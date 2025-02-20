@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -37,45 +38,43 @@ func init() {
 
 	// Add a global flag for the config file
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/Library/Application Support/gator-cobra/config.yaml or equivalent)")
-	// Add default db
-	viper.SetDefault("DB_URL", "")
-	viper.AutomaticEnv()
 }
 
-// initConfig reads in config file and ENV variables if set.
 func initConfig() {
-	if cfgFile != "" { // Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-	} else {
-		configDir, err := os.UserConfigDir()
-		if err != nil {
-			fmt.Println("Error finding config directory:", err)
-			os.Exit(1)
-		}
-
-		// Create the gator-cobra directory inside the config directory
-		gatorConfigDir := filepath.Join(configDir, "gator-cobra")
-		if err := os.MkdirAll(gatorConfigDir, 0755); err != nil {
-			fmt.Println("Error creating config directory:", err)
-			os.Exit(1)
-		}
-
-		viper.AddConfigPath(gatorConfigDir)
-		viper.SetConfigName("config") // Changed from .gator-cobra to config
-		viper.SetConfigType("yaml")
+	// Find config directory
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		fmt.Printf("Error finding config directory: %v\n", err)
+		os.Exit(1)
 	}
 
-	// Read the config file
+	// Ensure gator-cobra config directory exists
+	gatorConfigDir := filepath.Join(configDir, "gator-cobra")
+	if err := os.MkdirAll(gatorConfigDir, 0755); err != nil {
+		fmt.Printf("Error creating config directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Set up Viper for config file
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(gatorConfigDir)
+
+	// Set defaults for session management
+	viper.SetDefault("current_user", "")
+	viper.SetDefault("current_user_id", "")
+
+	// Load env file separately using godotenv
+	if err := godotenv.Load(); err != nil {
+		if !os.IsNotExist(err) {
+			fmt.Printf("Error loading .env file: %v\n", err)
+		}
+	}
+
+	// Try to read the config file
 	if err := viper.ReadInConfig(); err != nil {
-		// It's okay if there isn't a config file
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			defaultConfig := map[string]interface{}{
-				"current_user":    "",
-				"current_user_id": "",
-			}
-			for k, v := range defaultConfig {
-				viper.SetDefault(k, v)
-			}
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; create it with defaults
 			if err := viper.SafeWriteConfig(); err != nil {
 				fmt.Printf("Error creating config file: %v\n", err)
 			}
